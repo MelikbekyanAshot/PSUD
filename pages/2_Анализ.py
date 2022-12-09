@@ -25,15 +25,15 @@ abc_tab, metrics_tab, predict_tab = st.tabs(['ABC анализ', 'Метрики
 with abc_tab:
     col1, col2 = st.columns(2)
     with col1:
-        st.write('Здесь будет график парето')
-        analytics.plot_pareto_chart()
+        fig = analytics.plot_pareto_chart(start_date, end_date)
+        st.pyplot(fig)
 
     with col2:
         fig = analytics.brief_pie_chart(start_date, end_date)
         st.plotly_chart(fig, use_container_width=True)
 
 with metrics_tab:
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         summary_profit = analytics.summary_metrics(start_date, end_date)
         st.metric(label='Суммарная прибыль', value=summary_profit)
@@ -46,11 +46,20 @@ with metrics_tab:
         st.metric(label='Потрачено на доставку',
                   value=analytics.spent_on_delivery(start_date, end_date))
 
-    st.dataframe(analytics.rank_managers(start_date, end_date))
+    with col4:
+        st.metric(label='Количество клиентов',
+                  value=analytics.customer_number(start_date, end_date))
 
+    col1, col2 = st.columns(2)
+    with col1:
+        st.plotly_chart(analytics.rank_managers(start_date, end_date), use_container_width=True)
+    with col2:
+        st.plotly_chart(analytics.sales_by_customer_segment(start_date, end_date), use_container_width=True)
+
+    st.plotly_chart(analytics.rank_customers(start_date, end_date))
 
 with predict_tab:
-    profit_plot = analytics.plot_profit()
+    profit_plot = analytics.plot_sale_amount()
     st.bokeh_chart(profit_plot, use_container_width=True)
     col1, col2 = st.columns(2)
     with col1:

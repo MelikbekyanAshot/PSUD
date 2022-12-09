@@ -6,8 +6,10 @@ from abc_classification.abc_classifier import ABCClassifier
 from abc_classification.abc_visualiser import pareto_chart
 from bokeh.plotting import figure
 from bokeh.palettes import Spectral4
+from matplotlib.ticker import PercentFormatter
 
 import plotly.express as px
+import plotly.graph_objs as go
 
 
 class Analytics:
@@ -16,6 +18,7 @@ class Analytics:
         self.delivery_df = excel_data[1]
         self.dates_df = excel_data[2]
         self.products_df = excel_data[3]
+        self.customers_df = excel_data[4]
         self.managers_df = excel_data[5]
         self.preprocess_dataframe()
 
@@ -23,7 +26,7 @@ class Analytics:
         self.sales_df['Прибыль'] = self.sales_df['Прибыль'].str.replace(',', '.')
         self.sales_df['Прибыль'] = self.sales_df['Прибыль'].str.replace(' ', '')
         self.sales_df['Прибыль'] = self.sales_df['Прибыль'].astype(float)
-        self.dates_df['Дата'] = pd.to_datetime(self.dates_df['Дата'])
+        self.dates_df['Дата'] = pd.to_datetime(self.dates_df['Дата'], format="%Y%W-%w")
 
     def rank_managers(self, start_date, end_date):
         df = self.__join(self.sales_df, self.managers_df, 'Регион')
@@ -33,9 +36,11 @@ class Analytics:
             total_profit=('Прибыль', 'sum'),
             sales_amount=('Продукт', 'count')
         )
-        df.columns = ['Суммарная прибыль', 'Количество продаж']
+        df.columns = ['Прибыль', 'Количество продаж']
         df.index.name = 'Менеджер'
-        return df
+        fig = px.bar(df, x=df.index, y='Прибыль')
+        fig.update_layout(title_x=0.5)
+        return fig
 
     def spent_on_delivery(self, start_date, end_date):
         df = self.__join(self.sales_df, self.delivery_df, 'Метод доставки')
@@ -53,8 +58,34 @@ class Analytics:
         fig.update_layout(title_x=0.5)
         return fig
 
-    def plot_pareto_chart(self):
-        pass
+    def plot_pareto_chart(self, start_date, end_date):
+        df = self.sales_df \
+            .set_index('Order_ID') \
+            .join(self.dates_df.set_index('Order_ID'))
+        df = self.__join(df, self.products_df, 'Продукт')
+        df = df[(start_date <= df['Дата']) & (df['Дата'] <= end_date)]
+        df = df[df['Прибыль'] > 0]
+        group_by = 'Подкатегория продукта'
+        column = 'Прибыль'
+        df = df.groupby(group_by)[column].sum().reset_index()
+        df = df.sort_values(by=column, ascending=False)
+
+        df["cumpercentage"] = df[column].cumsum() / df[column].sum() * 100
+
+        fig, ax = plt.subplots(figsize=(20, 5))
+        ax.bar(df[group_by], df[column], color="C0")
+        ax2 = ax.twinx()
+        ax2.plot(df[group_by], df["cumpercentage"], color="C1", marker="D", ms=7)
+        ax2.yaxis.set_major_formatter(PercentFormatter())
+
+        ax.tick_params(axis="y", colors="C0")
+        ax2.tick_params(axis="y", colors="C1")
+
+        for tick in ax.get_xticklabels():
+            tick.set_rotation(45)
+        # plt.show()
+
+        return fig
 
     def __abc_analysis(self, start_date, end_date):
         df = self.sales_df \
@@ -67,16 +98,16 @@ class Analytics:
         brief = abc_clf.brief_abc(classified)
         return classified, brief
 
-    def plot_profit(self):
+    def plot_sale_amount(self):
         df = self.sales_df \
             .set_index('Order_ID') \
             .join(self.dates_df.set_index('Order_ID'))
-        df = df.groupby(by='Дата').sum()
+        df = df.groupby(df['Дата']).sum()
         p = figure(title='Прибыль',
                    x_axis_label='Дата',
                    y_axis_label='Дневная прибыль',
                    x_axis_type='datetime')
-        p.line(df.index, df['Прибыль'], line_width=2)
+        p.line(df.index, df['Количество'], line_width=2)
         return p
 
     def summary_metrics(self, start_date, end_date):
@@ -98,6 +129,41 @@ class Analytics:
         df = df[['Дата', level, 'Количество']]
         df = df[df[level].isin(items)]
         fig = px.line(data_frame=df, x='Дата', y='Количество', title='A')
+        fig.update_layout(title_x=0.5)
+        return fig
+
+    def customer_number(self, start_date, end_date):
+        df = self.__join(self.sales_df, self.dates_df, 'Order_ID')
+        df = df[(start_date <= df['Дата']) & (df['Дата'] <= end_date)]
+        return df['Покупатель'].nunique()
+
+    def rank_customers(self, start_date, end_date):
+        df = self.__join(self.sales_df, self.dates_df, 'Order_ID')
+        df = df[(start_date <= df['Дата']) & (df['Дата'] <= end_date)]
+        df = df.groupby('Покупатель').sum().sort_values('Прибыль', ascending=True)['Прибыль']
+        # st.dataframe(df)
+        fig = go.Figure(go.Bar(
+            x=df,
+            y=df.index,
+            orientation='h'))
+        fig.update_xaxes(type="log")
+        fig.update_layout(
+            xaxis_title="Логарифм прибыльности клиентов",
+            yaxis_title="Клиенты"
+        )
+        return fig
+
+
+    def sales_by_customer_segment(self, start_date, end_date):
+        df = self.__join(self.sales_df, self.customers_df, 'Покупатель')
+        df = self.__join(df, self.dates_df, 'Order_ID')
+        df = df[(start_date <= df['Дата']) & (df['Дата'] <= end_date)]
+        df = df.groupby('Сегмент покупателя').agg(
+            total_profit=('Прибыль', 'sum'),
+            sales_amount=('Продукт', 'count')
+        )
+        fig = px.bar(df, x=df.index, y=[df.total_profit, df.sales_amount], title='Прибыль по сегментам покупателей',
+                     labels={'y': 'Прибыль'})
         fig.update_layout(title_x=0.5)
         return fig
 
