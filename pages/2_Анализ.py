@@ -5,7 +5,7 @@ from data.constants import START_DATE, END_DATE
 import seaborn as sns
 import datetime
 
-excel_table = pd.read_excel('C:\\Users\\User\\Desktop\\python\\ПСУД\\data\\База данных.xlsx',
+excel_table = pd.read_excel('data/База данных.xlsx',
                             sheet_name=[0, 1, 2, 3, 4, 5])
 analytics = Analytics(excel_table)
 
