@@ -21,16 +21,16 @@ with end_date_col:
                                             min_value=START_DATE,
                                             max_value=END_DATE))
 
-abc_tab, metrics_tab, predict_tab = st.tabs(['ABC анализ', 'Метрики', 'Прогнозирование'])
+abc_tab, metrics_tab = st.tabs(['ABC анализ', 'Метрики'])
 with abc_tab:
-    col1, col2 = st.columns(2)
-    with col1:
-        fig = analytics.plot_pareto_chart(start_date, end_date)
-        st.pyplot(fig)
+    # col1, col2 = st.columns(2)
+    # with col1:
+    fig = analytics.plot_pareto_chart(start_date, end_date)
+    st.pyplot(fig)
 
-    with col2:
-        fig = analytics.brief_pie_chart(start_date, end_date)
-        st.plotly_chart(fig, use_container_width=True)
+    # with col2:
+    fig = analytics.brief_pie_chart(start_date, end_date)
+    st.plotly_chart(fig)
 
 with metrics_tab:
     col1, col2, col3, col4 = st.columns(4)
@@ -57,16 +57,3 @@ with metrics_tab:
         st.plotly_chart(analytics.sales_by_customer_segment(start_date, end_date), use_container_width=True)
 
     st.plotly_chart(analytics.rank_customers(start_date, end_date))
-
-with predict_tab:
-    profit_plot = analytics.plot_sale_amount()
-    st.bokeh_chart(profit_plot, use_container_width=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        level = st.selectbox('Выберите уровень представления',
-                             ['Категория продукта', 'Подкатегория продукта', 'Продукт'])
-    with col2:
-        items = st.multiselect('Выберите позиции',
-                               ['Technology', 'Office Supplies', 'Furniture'])
-    # fig = analytics.sales_by_days(level=level, items=items)
-    # st.plotly_chart(fig, use_container_width=True)

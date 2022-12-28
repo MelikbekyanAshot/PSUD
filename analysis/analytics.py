@@ -7,9 +7,15 @@ from abc_classification.abc_visualiser import pareto_chart
 from bokeh.plotting import figure
 from bokeh.palettes import Spectral4
 from matplotlib.ticker import PercentFormatter
+import numpy as np
 
 import plotly.express as px
 import plotly.graph_objs as go
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
 
 
 class Analytics:
@@ -26,6 +32,9 @@ class Analytics:
         self.sales_df['Прибыль'] = self.sales_df['Прибыль'].str.replace(',', '.')
         self.sales_df['Прибыль'] = self.sales_df['Прибыль'].str.replace(' ', '')
         self.sales_df['Прибыль'] = self.sales_df['Прибыль'].astype(float)
+        self.sales_df['Выручка'] = self.sales_df['Выручка'].str.replace(',', '.')
+        self.sales_df['Выручка'] = self.sales_df['Выручка'].str.replace(' ', '')
+        self.sales_df['Выручка'] = self.sales_df['Выручка'].astype(float)
         self.dates_df['Дата'] = pd.to_datetime(self.dates_df['Дата'], format="%Y%W-%w")
 
     def rank_managers(self, start_date, end_date):
@@ -38,7 +47,7 @@ class Analytics:
         )
         df.columns = ['Прибыль', 'Количество продаж']
         df.index.name = 'Менеджер'
-        fig = px.bar(df, x=df.index, y='Прибыль')
+        fig = px.bar(df, x=df.index, y='Прибыль', title='Прибыль по менеджерам')
         fig.update_layout(title_x=0.5)
         return fig
 
@@ -55,7 +64,10 @@ class Analytics:
         fig = px.pie(brief,
                      values='Прибыль', names='class',
                      title='Краткая сводка', )
-        fig.update_layout(title_x=0.5)
+        fig.update_layout(title_x=0.5,
+                          font=dict(   size=36))
+        fig.update_layout(legend=dict(font=dict(size=24)),
+                          legend_title=dict(font=dict(size=24)))
         return fig
 
     def plot_pareto_chart(self, start_date, end_date):
@@ -98,17 +110,27 @@ class Analytics:
         brief = abc_clf.brief_abc(classified)
         return classified, brief
 
-    def plot_sale_amount(self):
+    def plot_sale_amount(self, category: str):
         df = self.sales_df \
             .set_index('Order_ID') \
             .join(self.dates_df.set_index('Order_ID'))
+        df = self.__join(df, self.products_df, 'Продукт')
+        # st.write(df['Категория продукта'].unique())
+        df = df[df['Категория продукта'] == category]
         df = df.groupby(df['Дата']).sum()
-        p = figure(title='Прибыль',
-                   x_axis_label='Дата',
-                   y_axis_label='Дневная прибыль',
-                   x_axis_type='datetime')
-        p.line(df.index, df['Количество'], line_width=2)
-        return p
+        fig = px.scatter(
+            df, x=df.index, y='Прибыль', opacity=0.65,
+            trendline='ols', trendline_color_override='darkblue'
+        )
+        fig.show()
+        # st.dataframe(df)
+        #
+        # p = figure(title='Прибыль',
+        #            x_axis_label='Дата',
+        #            y_axis_label='Дневная прибыль',
+        #            x_axis_type='datetime')
+        # p.line(df.index, df['Количество'], line_width=2)
+        # return p
 
     def summary_metrics(self, start_date, end_date):
         df = self.sales_df \
@@ -145,11 +167,17 @@ class Analytics:
         fig = go.Figure(go.Bar(
             x=df,
             y=df.index,
-            orientation='h'))
+            orientation='h',
+            textfont=dict(
+                size=24,
+            )
+        ))
         fig.update_xaxes(type="log")
         fig.update_layout(
             xaxis_title="Логарифм прибыльности клиентов",
-            yaxis_title="Клиенты"
+            yaxis_title="Клиенты",
+            title="Топ клиентов",
+            title_x=0.5
         )
         return fig
 
